@@ -1,0 +1,116 @@
+import React, { useState, useCallback } from 'react';
+import { Button, StyleSheet, Text, TextInput, View, StatusBar } from 'react-native';
+import axios from 'axios';
+import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system';
+
+export default function App() {
+  const [data, setData] = useState([]);
+  const [newVid, setNewVid] = useState('');
+  const [newPartNo, setNewPartNo] = useState('');
+  const [newHouse, setNewHouse] = useState('');
+
+  const fetchData = useCallback(async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (newVid) {
+        queryParams.append('vid', newVid);
+      }
+      if (newPartNo) {
+        queryParams.append('partNo', newPartNo.toString());
+      }
+      if (newHouse) {
+        queryParams.append('house', newHouse);
+      }
+
+      const apiUrl = `https://voter-backend-2oi2.onrender.com/voterdata?${queryParams}`;
+
+      const response = await axios.get(apiUrl);
+      setData(response.data.data);
+    } catch (err) {
+      console.log(err);
+    }
+  }, [newVid, newPartNo, newHouse]);
+
+  const renderCards = () => {
+    if (data.length === 0) {
+      return null;
+    }
+
+    return data.map((record, index) => (
+      <View key={index} style={styles.card}>
+        <Text>Name: {record.NAME}</Text>
+        <Text>PS Name (English): {record.PS_NAME_EN}</Text>
+        <Text>House No: {record.C_HOUSE_NO}</Text>
+        <Text>EPIC No: {record.EPIC_NO}</Text>
+        <Text>Part No: {record.PART_NO}</Text>
+        <Button onPress={() => downloadCardAsImage(record)} title="Download Card"></Button>
+      </View>
+    ));
+  };
+
+  const downloadCardAsImage = async (record) => {
+    try {
+      const htmlContent = `
+       
+            <h1>Name: ${record.NAME}</h1>
+            <p>PS Name (English): ${record.PS_NAME_EN}</p>
+            <p>House No: ${record.C_HOUSE_NO}</p>
+            <p>EPIC No: ${record.EPIC_NO}</p>
+            <p>Part No: ${record.PART_NO}</p>
+        
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html: htmlContent });
+
+      const fileName = `VoterCard_${record.NAME.replace(/\s/g, '_')}.png`;
+      const pathToWrite = `${FileSystem.documentDirectory}${fileName}`;
+
+      await FileSystem.moveAsync({ from: uri, to: pathToWrite });
+
+      console.log('Image saved successfully:', pathToWrite);
+    } catch (error) {
+      console.error('Error saving image:', error);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <TextInput placeholder='vid' value={newVid} onChangeText={setNewVid} style={styles.input}></TextInput>
+      <TextInput placeholder='partno' value={newPartNo} onChangeText={setNewPartNo} style={styles.input}></TextInput>
+      <TextInput placeholder='house no' value={newHouse} onChangeText={setNewHouse} style={styles.input}></TextInput>
+      <Button onPress={fetchData} title="Submit"></Button>
+
+      {renderCards()}
+
+      <Text>Open up App.js to start working on your app!</Text>
+      <StatusBar style="auto" />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    width: '100%',
+  },
+  card: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    width: '100%',
+  },
+});
