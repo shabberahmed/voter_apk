@@ -1,16 +1,8 @@
-import React, { useState, useCallback, useRef } from 'react';
-import {
-  Button,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  StatusBar,
-  TouchableOpacity,
-} from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { Button, StyleSheet, Text, TextInput, View, StatusBar, TouchableOpacity } from 'react-native';
 import axios from 'axios';
-import ViewShot from 'react-native-view-shot';
-import RNFS from 'react-native-fs';
+import * as Print from 'expo-print';
+import * as FileSystem from 'expo-file-system';
 
 export default function App() {
   const [data, setData] = useState([]);
@@ -34,82 +26,56 @@ export default function App() {
       const apiUrl = `https://voter-backend-2oi2.onrender.com/voterdata?${queryParams}`;
 
       const response = await axios.get(apiUrl);
-      setData(response.data.data || []); // Ensure that response.data.data is an array
-
+      setData(response.data.data);
     } catch (err) {
-      console.error(err);
+      console.log(err);
     }
   }, [newVid, newPartNo, newHouse]);
 
+  const downloadCard = async (record) => {
+    // Create a CSV string with the card information
+    const csvData = `Name: ${record.NAME}\nPS Name (English): ${record.PS_NAME_EN}\nHouse No: ${record.C_HOUSE_NO}\nEPIC No: ${record.EPIC_NO}\nPart No: ${record.PART_NO}`;
+
+    // Define the file path and name
+    const filePath = `${FileSystem.documentDirectory}card_${record.EPIC_NO}.txt`;
+
+    // Write the CSV data to a file
+    await FileSystem.writeAsStringAsync(filePath, csvData);
+
+    // Show a success message or perform any other actions
+    console.log('File downloaded successfully:', filePath);
+  };
+
   const renderCards = () => {
-    if (!Array.isArray(data) || data.length === 0) {
-      return <Text>No data available</Text>;
+    if (data.length === 0) {
+      return null;
     }
 
     return data.map((record, index) => (
-      <ViewShot key={index} style={styles.card} options={{ format: 'png', quality: 0.9 }}>
-        {/* Render your card content here */}
-        <TouchableOpacity onPress={() => downloadCardAsImage(record)}>
-          <View style={{ backgroundColor: 'blue', padding: 10, margin: 5 }}>
-            <Text style={{ color: 'white', textAlign: 'center' }}>Download Card</Text>
-          </View>
+      <View key={index} style={styles.card}>
+        <Text>Name: {record.NAME}</Text>
+        <Text>PS Name (English): {record.PS_NAME_EN}</Text>
+        <Text>House No: {record.C_HOUSE_NO}</Text>
+        <Text>EPIC No: {record.EPIC_NO}</Text>
+        <Text>Part No: {record.PART_NO}</Text>
+
+        {/* Add a button to trigger the download */}
+        <TouchableOpacity
+          style={styles.downloadButton}
+          onPress={() => downloadCard(record)}
+        >
+          <Text style={styles.buttonText}>Download Card</Text>
         </TouchableOpacity>
-      </ViewShot>
+      </View>
     ));
   };
 
-  const downloadCardAsImage = async (record) => {
-    try {
-      const htmlContent = `
-            <h1>Name: ${record.NAME}</h1>
-            <p>PS Name (English): ${record.PS_NAME_EN}</p>
-            <p>House No: ${record.C_HOUSE_NO}</p>
-            <p>EPIC No: ${record.EPIC_NO}</p>
-            <p>Part No: ${record.PART_NO}</p>
-      `;
-
-      // Ensure that viewShotRef is defined
-      if (!viewShotRef.current) {
-        console.error('viewShotRef is not defined');
-        return;
-      }
-
-      const uri = await viewShotRef.current.capture();
-
-      const fileName = `VoterCard_${record.NAME.replace(/\s/g, '_')}.png`;
-      const pathToWrite = `${RNFS.DocumentDirectoryPath}/${fileName}`;
-
-      await RNFS.copyFile(uri, pathToWrite);
-
-      console.log('Image saved successfully:', pathToWrite);
-    } catch (error) {
-      console.error('Error saving image:', error);
-    }
-  };
-
-  const viewShotRef = useRef(null);
-
   return (
     <View style={styles.container}>
-      <TextInput
-        placeholder="vid"
-        value={newVid}
-        onChangeText={setNewVid}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="partno"
-        value={newPartNo}
-        onChangeText={setNewPartNo}
-        style={styles.input}
-      />
-      <TextInput
-        placeholder="house no"
-        value={newHouse}
-        onChangeText={setNewHouse}
-        style={styles.input}
-      />
-      <Button onPress={fetchData} title="Submit" />
+      <TextInput placeholder='vid' value={newVid} onChangeText={setNewVid} style={styles.input}></TextInput>
+      <TextInput placeholder='partno' value={newPartNo} onChangeText={setNewPartNo} style={styles.input}></TextInput>
+      <TextInput placeholder='house no' value={newHouse} onChangeText={setNewHouse} style={styles.input}></TextInput>
+      <Button onPress={fetchData} title="Submit"></Button>
 
       {renderCards()}
 
@@ -142,5 +108,16 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     width: '100%',
+  },
+  downloadButton: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
